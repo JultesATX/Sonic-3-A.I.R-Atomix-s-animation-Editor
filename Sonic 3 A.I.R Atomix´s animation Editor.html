@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sonic 3 A.I.R Atomix's Animation Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background-color: #1a1a1a; color: #d1d5db; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
+        .canvas-container { background-color: #262626; }
+        
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 5px; border: 2px solid #1a1a1a; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+
+        canvas { 
+            image-rendering: pixelated; 
+            image-rendering: crisp-edges; 
+            -ms-interpolation-mode: nearest-neighbor;
+        }
+        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { opacity: 1; }
+    </style>
+</head>
+<body class="h-screen flex flex-col text-xs select-none">
+
+    <!-- Top Menu Bar -->
+    <header class="bg-[#111] border-b border-[#333] px-3 py-1.5 flex items-center justify-between shrink-0 gap-2 flex-wrap">
+        <div class="flex items-center gap-3">
+            <span class="font-bold text-slate-200 hidden sm:inline">Sonic 3 A.I.R Atomix's Animation Editor</span>
+            
+            <div class="flex items-center gap-1.5 sm:border-l sm:border-[#333] sm:pl-3">
+                <label class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded cursor-pointer transition flex items-center gap-1 font-medium shadow text-[11px]">
+                    <i data-lucide="file-code" class="w-3.5 h-3.5"></i> Abrir .JSON
+                    <input type="file" id="jsonInput" accept=".json" class="hidden">
+                </label>
+
+                <label class="bg-[#2a2a2a] hover:bg-[#333] text-slate-200 px-2.5 py-1 rounded border border-[#404040] cursor-pointer transition flex items-center gap-1 text-[11px]">
+                    <i data-lucide="image" class="w-3.5 h-3.5 text-cyan-400"></i> Imágenes (.png, .gif, .bmp)
+                    <input type="file" id="pngInput" accept="image/png, image/gif, image/bmp" multiple class="hidden">
+                </label>
+
+                <button id="btnExportJSON" class="bg-[#2a2a2a] hover:bg-[#333] text-slate-200 px-2.5 py-1 rounded border border-[#404040] transition flex items-center gap-1 text-[11px]">
+                    <i data-lucide="save" class="w-3.5 h-3.5"></i> <span class="hidden md:inline">Guardar</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Boton Modo Animacion Principal -->
+            <button id="btnToggleAnimMode" class="bg-purple-900/80 border border-purple-600 text-purple-200 px-3 py-1 rounded flex items-center gap-1.5 hover:bg-purple-800 transition font-medium text-[11px]">
+                <i data-lucide="play-circle" id="animModeIcon" class="w-3.5 h-3.5 text-purple-300"></i> <span id="animModeLabel">Modo Animación</span>
+            </button>
+
+            <!-- Selector de Color de Borde -->
+            <div class="flex items-center gap-1 bg-[#222] border border-[#333] px-2 py-0.5 rounded text-[11px]">
+                <span class="text-slate-400">Borde:</span>
+                <select id="borderColorSelect" class="bg-[#111] text-slate-200 border border-[#404040] rounded px-1.5 py-0.5 focus:outline-none focus:border-blue-500">
+                    <option value="#a855f7">Morado</option>
+                    <option value="#ffffff">Blanco</option>
+                    <option value="#000000">Negro</option>
+                </select>
+            </div>
+
+            <button id="btnToggleMobileSidebar" class="md:hidden bg-blue-950/80 border border-blue-600 text-blue-300 px-2.5 py-1 rounded flex items-center gap-1 text-[11px]">
+                <i data-lucide="layers" class="w-3.5 h-3.5"></i> Frames
+            </button>
+            <button id="btnToggleProps" class="md:hidden bg-[#222] border border-[#404040] text-slate-300 px-2 py-1 rounded flex items-center gap-1 text-[11px]">
+                <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+            </button>
+            <button id="toggleShowFullImage" class="bg-[#222] text-slate-300 px-2.5 py-1 rounded border border-[#333] flex items-center gap-1 hover:bg-[#333] text-[11px]">
+                <i data-lucide="maximize" class="w-3.5 h-3.5"></i> <span id="lblShowFullImage" class="hidden sm:inline">Ver: Recortado</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- Left Sidebar -->
+        <aside id="sidebarList" class="absolute md:relative inset-y-0 left-0 z-30 w-64 bg-[#181818] border-r border-[#333] flex flex-col shrink-0 transform -translate-x-full md:translate-x-0 transition-transform duration-200 shadow-2xl">
+            <div class="p-2 border-b border-[#333] font-semibold bg-[#222] text-slate-300 flex items-center justify-between">
+                <span class="truncate">Working Animation (<span id="spriteCount">0</span>)</span>
+                <button id="btnCloseSidebar" class="md:hidden text-slate-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div id="spriteList" class="flex-1 overflow-y-auto font-mono">
+                <div class="text-center py-12 px-4 text-slate-500">
+                    Abre un archivo <b>.json</b> para comenzar.
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center: Canvas Viewport -->
+        <main class="flex-1 flex flex-col bg-[#222] relative overflow-hidden">
+            <div class="absolute top-2 left-2 z-10 bg-black/60 backdrop-blur-sm border border-white/10 px-2.5 py-1 rounded text-slate-300 font-mono text-[11px] pointer-events-none flex items-center gap-1.5 shadow">
+                <span class="w-2 h-2 rounded-full bg-blue-500" id="statusDot"></span>
+                <span id="floatingFrameName">No hay frame seleccionado</span>
+            </div>
+
+            <!-- Controles flotantes del frame -->
+            <div id="animControlBar" class="absolute top-2 right-2 z-20 bg-[#1c1c1c]/90 backdrop-blur-md border border-purple-500/50 px-3 py-1.5 rounded-lg shadow-xl flex items-center gap-3 hidden">
+                <button id="btnAnimPlay" class="bg-purple-600 hover:bg-purple-500 text-white font-medium px-3 py-1 rounded flex items-center gap-1 transition shadow text-[11px]">
+                    <i data-lucide="play" id="playIcon" class="w-3.5 h-3.5"></i> <span id="playLabel">Play</span>
+                </button>
+                <div class="flex items-center gap-1.5">
+                    <span class="text-purple-300 text-[10px]">FPS:</span>
+                    <input type="number" id="animFpsInput" min="1" max="25" value="5" class="w-12 bg-[#111010] border border-[#404040] rounded px-1.5 py-0.5 text-center font-mono text-slate-100 focus:outline-none focus:border-purple-500 text-[11px]">
+                </div>
+                <div class="flex items-center gap-1 border-l border-[#333] pl-2">
+                    <span class="text-slate-500 text-[9px] mr-0.5">Presets:</span>
+                    <button class="fps-preset bg-[#262626] hover:bg-[#333] border border-[#404040] px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-300" data-fps="1">1</button>
+                    <button class="fps-preset bg-[#262626] hover:bg-[#333] border border-[#404040] px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-300" data-fps="5">5</button>
+                    <button class="fps-preset bg-[#262626] hover:bg-[#333] border border-[#404040] px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-300" data-fps="10">10</button>
+                    <button class="fps-preset bg-[#262626] hover:bg-[#333] border border-[#404040] px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-300" data-fps="15">15</button>
+                    <button class="fps-preset bg-[#262626] hover:bg-[#333] border border-[#404040] px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-300" data-fps="20">20</button>
+                    <button class="fps-preset bg-[#262626] hover:bg-[#333] border border-[#404040] px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-300" data-fps="25">25</button>
+                </div>
+            </div>
+
+            <div id="viewport" class="flex-1 canvas-container relative overflow-hidden flex items-center justify-center cursor-default">
+                <canvas id="spriteCanvas" class="block"></canvas>
+            </div>
+
+            <!-- Bottom Frame Sequence Strip -->
+            <div class="h-24 bg-[#141414] border-t border-[#333] flex items-center px-2 gap-2 overflow-x-auto shrink-0" id="frameStrip">
+                <span class="text-slate-600 text-[11px] mx-auto">Cargue un archivo JSON para ver la tira de frames</span>
+            </div>
+        </main>
+
+        <!-- Right: Frame Properties Panel -->
+        <aside id="sidebarProps" class="absolute md:relative inset-y-0 right-0 z-30 w-64 bg-[#181818] border-l border-[#333] p-3 flex flex-col gap-4 shrink-0 overflow-y-auto transform translate-x-full md:translate-x-0 transition-transform duration-200 shadow-2xl">
+            <div class="flex items-center justify-between md:hidden pb-1 border-b border-[#333]">
+                <span class="font-bold text-slate-200">Frame Properties</span>
+                <button id="btnCloseProps" class="text-slate-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div>
+                <h3 class="font-bold text-slate-200 border-b border-[#333] pb-1 mb-2 hidden md:block">Frame Properties</h3>
+                <div class="space-y-2">
+                    <div class="bg-[#222] border border-[#333] p-2 rounded flex items-center justify-between">
+                        <label class="text-[11px] text-purple-300 font-medium cursor-pointer" for="propAnimCheck">Incluir en Animación</label>
+                        <input type="checkbox" id="propAnimCheck" class="w-4 h-4 accent-purple-600 cursor-pointer">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-0.5">Width</label>
+                            <input type="number" id="propW" class="w-full bg-[#262626] border border-[#404040] rounded px-2 py-1 text-slate-100 font-mono focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-0.5">Height</label>
+                            <input type="number" id="propH" class="w-full bg-[#262626] border border-[#404040] rounded px-2 py-1 text-slate-100 font-mono focus:border-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-0.5">X</label>
+                            <input type="number" id="propX" class="w-full bg-[#262626] border border-[#404040] rounded px-2 py-1 text-slate-100 font-mono focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 block mb-0.5">Y</label>
+                            <input type="number" id="propY" class="w-full bg-[#262626] border border-[#404040] rounded px-2 py-1 text-slate-100 font-mono focus:border-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                            <label class="text-[10px] text-yellow-500 block mb-0.5">Center X</label>
+                            <input type="number" id="propCX" class="w-full bg-[#262626] border border-[#404040] rounded px-2 py-1 text-slate-100 font-mono focus:border-yellow-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-yellow-500 block mb-0.5">Center Y</label>
+                            <input type="number" id="propCY" class="w-full bg-[#262626] border border-[#404040] rounded px-2 py-1 text-slate-100 font-mono focus:border-yellow-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-slate-400 block mb-0.5">Name</label>
+                        <input type="text" id="propName" readonly class="w-full bg-[#111] border border-[#333] rounded px-2 py-1 text-slate-400 font-mono">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-slate-400 block mb-0.5">File</label>
+                        <input type="text" id="propFile" readonly class="w-full bg-[#111] border border-[#333] rounded px-2 py-1 text-slate-400 font-mono">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-auto border-t border-[#333] pt-2 text-[10px] text-slate-500 hidden md:block">
+                By Atomix
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        let spriteData = {};
+        let loadedImages = {}; 
+        let jsonFileName = "sprites.json";
+
+        let selectedKey = null;
+        let showFullImage = false;
+        let scale = 4;
+
+        let isAnimMode = false;
+        let isPlayingAnim = false;
+        let animInterval = null;
+        let currentAnimFrameIndex = 0;
+
+        const canvas = document.getElementById('spriteCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const viewport = document.getElementById('viewport');
+        const jsonInput = document.getElementById('jsonInput');
+        const pngInput = document.getElementById('pngInput');
+        const spriteList = document.getElementById('spriteList');
+        const spriteCount = document.getElementById('spriteCount');
+        const frameStrip = document.getElementById('frameStrip');
+        const floatingFrameName = document.getElementById('floatingFrameName');
+        const statusDot = document.getElementById('statusDot');
+        const borderColorSelect = document.getElementById('borderColorSelect');
+
+        const sidebarList = document.getElementById('sidebarList');
+        const sidebarProps = document.getElementById('sidebarProps');
+        const btnToggleMobileSidebar = document.getElementById('btnToggleMobileSidebar');
+        const btnToggleProps = document.getElementById('btnToggleProps');
+        const btnCloseSidebar = document.getElementById('btnCloseSidebar');
+        const btnCloseProps = document.getElementById('btnCloseProps');
+
+        const propW = document.getElementById('propW');
+        const propH = document.getElementById('propH');
+        const propX = document.getElementById('propX');
+        const propY = document.getElementById('propY');
+        const propCX = document.getElementById('propCX');
+        const propCY = document.getElementById('propCY');
+        const propName = document.getElementById('propName');
+        const propFile = document.getElementById('propFile');
+        const propAnimCheck = document.getElementById('propAnimCheck');
+
+        const toggleShowFullImage = document.getElementById('toggleShowFullImage');
+        const lblShowFullImage = document.getElementById('lblShowFullImage');
+        const btnExportJSON = document.getElementById('btnExportJSON');
+
+        const btnToggleAnimMode = document.getElementById('btnToggleAnimMode');
+        const animModeLabel = document.getElementById('animModeLabel');
+        const animModeIcon = document.getElementById('animModeIcon');
+        const animControlBar = document.getElementById('animControlBar');
+        const btnAnimPlay = document.getElementById('btnAnimPlay');
+        const playIcon = document.getElementById('playIcon');
+        const playLabel = document.getElementById('playLabel');
+        const animFpsInput = document.getElementById('animFpsInput');
+
+        window.onload = () => {
+            lucide.createIcons();
+            setupEvents();
+            window.addEventListener('resize', () => drawCanvas());
+        };
+
+        function setupEvents() {
+            jsonInput.addEventListener('change', handleJsonSelect);
+            pngInput.addEventListener('change', handlePngSelect);
+            borderColorSelect.addEventListener('change', () => drawCanvas());
+            
+            toggleShowFullImage.addEventListener('click', () => {
+                showFullImage = !showFullImage;
+                lblShowFullImage.textContent = showFullImage ? "Ver: Hoja Completa" : "Ver: Recortado";
+                drawCanvas();
+            });
+
+            btnExportJSON.addEventListener('click', exportJSON);
+
+            btnToggleMobileSidebar.addEventListener('click', () => sidebarList.classList.toggle('-translate-x-full'));
+            btnCloseSidebar.addEventListener('click', () => sidebarList.classList.add('-translate-x-full'));
+            btnToggleProps.addEventListener('click', () => sidebarProps.classList.toggle('translate-x-full'));
+            btnCloseProps.addEventListener('click', () => sidebarProps.classList.add('translate-x-full'));
+
+            [propW, propH, propX, propY, propCX, propCY].forEach(input => {
+                input.addEventListener('input', updateCurrentFromInputs);
+            });
+
+            propAnimCheck.addEventListener('change', () => {
+                if (!selectedKey || !spriteData[selectedKey]) return;
+                spriteData[selectedKey].animate = propAnimCheck.checked;
+                renderStrip();
+                if (isAnimMode) drawCanvas();
+            });
+
+            viewport.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const factor = e.deltaY < 0 ? 1.15 : 0.85;
+                scale = Math.max(0.5, Math.min(30, scale * factor));
+                drawCanvas();
+            }, { passive: false });
+
+            frameStrip.addEventListener('wheel', (e) => {
+                if (e.deltaY !== 0) {
+                    e.preventDefault();
+                    frameStrip.scrollLeft += e.deltaY;
+                }
+            }, { passive: false });
+
+            window.addEventListener('keydown', (e) => {
+                const keys = Object.keys(spriteData);
+                if (keys.length === 0) return;
+                if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const currentIndex = keys.indexOf(selectedKey);
+                    let newIndex = currentIndex;
+
+                    if (e.key === 'ArrowLeft') {
+                        newIndex = currentIndex > 0 ? currentIndex - 1 : keys.length - 1;
+                    } else if (e.key === 'ArrowRight') {
+                        newIndex = currentIndex < keys.length - 1 ? currentIndex + 1 : 0;
+                    }
+
+                    if (newIndex >= 0 && newIndex < keys.length) {
+                        selectSprite(keys[newIndex]);
+                    }
+                }
+            });
+
+            btnToggleAnimMode.addEventListener('click', () => {
+                isAnimMode = !isAnimMode;
+                if (isAnimMode) {
+                    animModeLabel.textContent = "Editor de Frames";
+                    animModeIcon.setAttribute('data-lucide', 'sliders');
+                    btnToggleAnimMode.className = "bg-blue-900/80 border border-blue-600 text-blue-200 px-3 py-1 rounded flex items-center gap-1.5 hover:bg-blue-800 transition font-medium text-[11px]";
+                    animControlBar.classList.remove('hidden');
+                    currentAnimFrameIndex = 0;
+                } else {
+                    stopAnimationLoop();
+                    animModeLabel.textContent = "Modo Animación";
+                    animModeIcon.setAttribute('data-lucide', 'play-circle');
+                    btnToggleAnimMode.className = "bg-purple-900/80 border border-purple-600 text-purple-200 px-3 py-1 rounded flex items-center gap-1.5 hover:bg-purple-800 transition font-medium text-[11px]";
+                    animControlBar.classList.add('hidden');
+                }
+                lucide.createIcons();
+                drawCanvas();
+            });
+
+            btnAnimPlay.addEventListener('click', toggleAnimationPlay);
+
+            animFpsInput.addEventListener('input', () => {
+                let val = parseInt(animFpsInput.value);
+                if (val < 1) val = 1;
+                if (val > 25) val = 25;
+                animFpsInput.value = val;
+                if (isPlayingAnim) {
+                    restartAnimationLoop();
+                }
+            });
+
+            document.querySelectorAll('.fps-preset').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    animFpsInput.value = btn.getAttribute('data-fps');
+                    if (isPlayingAnim) {
+                        restartAnimationLoop();
+                    }
+                });
+            });
+        }
+
+        async function handleJsonSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            jsonFileName = file.name;
+            try {
+                const text = await file.text();
+                const cleanText = text.replace(/,\s*([\}\]])/g, '$1');
+                spriteData = JSON.parse(cleanText);
+            } catch (err) {
+                alert("Error al leer el archivo JSON: " + err.message);
+                return;
+            }
+
+            renderSpriteList();
+            renderStrip();
+            const keys = Object.keys(spriteData);
+            if (keys.length > 0) {
+                selectSprite(keys[0]);
+            }
+        }
+
+        async function handlePngSelect(e) {
+            const files = Array.from(e.target.files);
+            for (const file of files) {
+                const img = new Image();
+                img.src = URL.createObjectURL(file);
+                await img.decode();
+                loadedImages[file.name] = img;
+            }
+            drawCanvas();
+            renderStrip();
+        }
+
+        function renderSpriteList() {
+            spriteList.innerHTML = '';
+            const keys = Object.keys(spriteData);
+            spriteCount.textContent = keys.length;
+
+            keys.forEach(key => {
+                const div = document.createElement('div');
+                div.className = `px-3 py-1.5 cursor-pointer border-b border-[#222] hover:bg-[#252525] truncate flex items-center justify-between ${
+                    key === selectedKey ? 'bg-blue-900/40 text-blue-300 font-semibold border-l-2 border-l-blue-500' : 'text-slate-400'
+                }`;
+                
+                const spanName = document.createElement('span');
+                spanName.textContent = key;
+                spanName.className = "truncate";
+                div.appendChild(spanName);
+
+                if (spriteData[key].animate) {
+                    const badge = document.createElement('span');
+                    badge.className = "w-2 h-2 rounded-full bg-purple-500 shrink-0 ml-1";
+                    div.appendChild(badge);
+                }
+
+                div.onclick = () => {
+                    selectSprite(key);
+                    if (window.innerWidth < 768) sidebarList.classList.add('-translate-x-full');
+                };
+                spriteList.appendChild(div);
+            });
+        }
+
+        function selectSprite(key) {
+            selectedKey = key;
+            if (!isAnimMode) {
+                floatingFrameName.textContent = key;
+            }
+            renderSpriteList();
+            fillForm();
+            highlightStripItem();
+            drawCanvas();
+        }
+
+        function fillForm() {
+            if (!selectedKey || !spriteData[selectedKey]) return;
+            const item = spriteData[selectedKey];
+            const [x, y, w, h] = (item.Rect || "0,0,0,0").split(',').map(n => parseInt(n.trim()) || 0);
+            const [cx, cy] = (item.Center || "0,0").split(',').map(n => parseInt(n.trim()) || 0);
+
+            propName.value = selectedKey;
+            propFile.value = item.File || "";
+            propX.value = x;
+            propY.value = y;
+            propW.value = w;
+            propH.value = h;
+            propCX.value = cx;
+            propCY.value = cy;
+            propAnimCheck.checked = !!item.animate;
+        }
+
+        function updateCurrentFromInputs() {
+            if (!selectedKey || !spriteData[selectedKey]) return;
+            const x = parseInt(propX.value) || 0;
+            const y = parseInt(propY.value) || 0;
+            const w = parseInt(propW.value) || 0;
+            const h = parseInt(propH.value) || 0;
+            const cx = parseInt(propCX.value) || 0;
+            const cy = parseInt(propCY.value) || 0;
+
+            spriteData[selectedKey].Rect = `${x},${y},${w},${h}`;
+            spriteData[selectedKey].Center = `${cx},${cy}`;
+
+            drawCanvas();
+            renderStrip();
+        }
+
+        function renderStrip() {
+            frameStrip.innerHTML = '';
+            const keys = Object.keys(spriteData);
+
+            if (keys.length === 0) {
+                frameStrip.innerHTML = `<span class="text-slate-600 text-[11px] mx-auto">No hay frames cargados</span>`;
+                return;
+            }
+
+            keys.forEach(k => {
+                const item = spriteData[k];
+                const img = loadedImages[item.File];
+                const [x, y, w, h] = (item.Rect || "0,0,0,0").split(',').map(n => parseInt(n.trim()) || 0);
+
+                const c = document.createElement('canvas');
+                c.width = Math.max(1, w);
+                c.height = Math.max(1, h);
+                const cCtx = c.getContext('2d');
+                cCtx.imageSmoothingEnabled = false;
+
+                if (img) {
+                    cCtx.drawImage(img, x, y, w, h, 0, 0, w, h);
+                }
+
+                const wrapper = document.createElement('div');
+                wrapper.id = `strip-item-${k}`;
+                wrapper.className = `p-1 rounded cursor-pointer border shrink-0 flex flex-col items-center gap-1 transition relative ${
+                    k === selectedKey ? 'border-blue-500 bg-blue-950/40' : 'border-[#333] bg-[#1a1a1a] hover:border-slate-500'
+                }`;
+                wrapper.onclick = () => selectSprite(k);
+
+                if (item.animate) {
+                    const indicator = document.createElement('div');
+                    indicator.className = "absolute top-1 right-1 w-2 h-2 rounded-full bg-purple-500 shadow";
+                    wrapper.appendChild(indicator);
+                }
+
+                wrapper.appendChild(c);
+
+                const label = document.createElement('span');
+                label.className = "text-[9px] font-mono text-slate-400 truncate max-w-[60px]";
+                label.textContent = k;
+                wrapper.appendChild(label);
+
+                frameStrip.appendChild(wrapper);
+            });
+        }
+
+        function highlightStripItem() {
+            const items = frameStrip.querySelectorAll('div[id^="strip-item-"]');
+            items.forEach(el => {
+                const isSelected = el.id === `strip-item-${selectedKey}`;
+                el.className = `p-1 rounded cursor-pointer border shrink-0 flex flex-col items-center gap-1 transition relative ${
+                    isSelected ? 'border-blue-500 bg-blue-950/40' : 'border-[#333] bg-[#1a1a1a] hover:border-slate-500'
+                }`;
+            });
+            const active = document.getElementById(`strip-item-${selectedKey}`);
+            if (active) {
+                active.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+            }
+        }
+
+        function getAnimatedFrames() {
+            return Object.keys(spriteData).filter(k => spriteData[k].animate);
+        }
+
+        function toggleAnimationPlay() {
+            if (isPlayingAnim) {
+                stopAnimationLoop();
+            } else {
+                startAnimationLoop();
+            }
+        }
+
+        function startAnimationLoop() {
+            const animFrames = getAnimatedFrames();
+            if (animFrames.length === 0) {
+                alert("Selecciona al menos un frame marcando la casilla 'Incluir en Animación'.");
+                return;
+            }
+
+            isPlayingAnim = true;
+            playLabel.textContent = "Pause";
+            playIcon.setAttribute('data-lucide', 'pause');
+            lucide.createIcons();
+
+            const fps = parseInt(animFpsInput.value) || 5;
+            const intervalMs = 1000 / fps;
+
+            animInterval = setInterval(() => {
+                const frames = getAnimatedFrames();
+                if (frames.length === 0) {
+                    stopAnimationLoop();
+                    return;
+                }
+                currentAnimFrameIndex = (currentAnimFrameIndex + 1) % frames.length;
+                drawCanvas();
+            }, intervalMs);
+        }
+
+        function stopAnimationLoop() {
+            isPlayingAnim = false;
+            playLabel.textContent = "Play";
+            playIcon.setAttribute('data-lucide', 'play');
+            lucide.createIcons();
+            if (animInterval) {
+                clearInterval(animInterval);
+                animInterval = null;
+            }
+        }
+
+        function restartAnimationLoop() {
+            stopAnimationLoop();
+            startAnimationLoop();
+        }
+
+        function drawCanvas() {
+            const vW = viewport.clientWidth;
+            const vH = viewport.clientHeight;
+
+            canvas.width = vW;
+            canvas.height = vH;
+            ctx.imageSmoothingEnabled = false;
+            ctx.clearRect(0, 0, vW, vH);
+
+            const centerX = vW / 2;
+            const centerY = vH / 2;
+            const borderColor = borderColorSelect.value;
+
+            if (isAnimMode) {
+                statusDot.className = "w-2 h-2 rounded-full bg-purple-500";
+                const animFrames = getAnimatedFrames();
+                if (animFrames.length === 0) {
+                    floatingFrameName.textContent = "Modo Animación: No hay frames seleccionados";
+                    return;
+                }
+
+                if (currentAnimFrameIndex >= animFrames.length) {
+                    currentAnimFrameIndex = 0;
+                }
+
+                const key = animFrames[currentAnimFrameIndex];
+                const item = spriteData[key];
+                if (!item) return;
+                const img = loadedImages[item.File];
+                if (!img) return;
+
+                floatingFrameName.textContent = `Animando [${currentAnimFrameIndex + 1}/${animFrames.length}]: ${key}`;
+
+                const [x, y, w, h] = (item.Rect || "0,0,0,0").split(',').map(n => parseInt(n.trim()) || 0);
+                const [cx, cy] = (item.Center || "0,0").split(',').map(n => parseInt(n.trim()) || 0);
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.scale(scale, scale);
+                ctx.drawImage(img, x, y, w, h, -cx, -cy, w, h);
+                ctx.restore();
+            } else {
+                statusDot.className = "w-2 h-2 rounded-full bg-blue-500";
+                if (!selectedKey || !spriteData[selectedKey]) return;
+                const item = spriteData[selectedKey];
+                const img = loadedImages[item.File];
+
+                const [x, y, w, h] = (item.Rect || "0,0,0,0").split(',').map(n => parseInt(n.trim()) || 0);
+                const [cx, cy] = (item.Center || "0,0").split(',').map(n => parseInt(n.trim()) || 0);
+
+                if (!img) return;
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.scale(scale, scale);
+
+                if (showFullImage) {
+                    const pivotAbsX = x + cx;
+                    const pivotAbsY = y + cy;
+
+                    ctx.drawImage(img, -pivotAbsX, -pivotAbsY);
+
+                    ctx.strokeStyle = borderColor;
+                    ctx.lineWidth = 1 / scale;
+                    ctx.strokeRect(-pivotAbsX + x, -pivotAbsY + y, w, h);
+
+                    ctx.fillStyle = '#facc15';
+                    ctx.fillRect(-0.5, -0.5, 1, 1);
+                } else {
+                    const localX = -cx;
+                    const localY = -cy;
+
+                    ctx.drawImage(img, x, y, w, h, localX, localY, w, h);
+
+                    ctx.strokeStyle = borderColor;
+                    ctx.lineWidth = 1 / scale;
+                    ctx.strokeRect(localX, localY, w, h);
+                }
+
+                ctx.restore();
+            }
+            canvas.style.transform = 'none';
+        }
+
+        function exportJSON() {
+            if (Object.keys(spriteData).length === 0) return;
+            const blob = new Blob([JSON.stringify(spriteData, null, 2)], { type: "application/json" });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = jsonFileName;
+            a.click();
+        }
+    </script>
+</body>
+</html>
